@@ -13,30 +13,41 @@
 #include <unistd.h>
 #include <time.h>
 
-#define PORT 5000
-#define DEST_IP "XXX.XXX.XXX.XXX"
-#define DEST_MAC "AA:BB:CC:DD:EE:FF"
+#define SIZE 816
+
+#define PORT 50000
+#define DEST_MAC "AA:BB:CC:DD:EE:FF\0" //Put your target's MAC address here!
+#define PARTIAL "sudo etherwake -i eth0 "
 
 #define SA struct sockaddr
 
-//Receive the client's desired file and send them packets with the data
-void processUDPTransfer(int sockid, struct sockaddr_in servaddr)
+//Loop while waiting for a Magic Packet to arrive to the server
+void listenForWOL(int sockid, struct sockaddr_in servaddr)
 {
 
-	char receive_buffer[4];
-
+	char receive_buffer[SIZE];
 	int addrLen = sizeof(servaddr);
-	recvfrom(sockid, receive_buffer, sizeof(receive_buffer), 0, (struct sockaddr *)&servaddr, &addrLen);
-	printf("Received message %s\n", receive_buffer);
+	
+	while(1){
+	
+		recvfrom(sockid, receive_buffer, sizeof(receive_buffer), 0, (struct sockaddr *)&servaddr, &addrLen);
+		printf("Received WOL Packet -- Waking up target system\n");
+		
+		char  partial[24] = PARTIAL;
+		char* command = strcat(partial, DEST_MAC);
+		system(command); //Relay WOL command to target computer via eth0
+		
+	}
+	
 
 }
 
 
-//Establish the connection and run the main program once
-//Successfully connected to a client
+//Establish the connection and begin waiting for packets
 int main(int argc, char* argv[])
 {
 
+	int portId = PORT;
 	int sockid, connection, addrLen;
 	struct sockaddr_in servaddr, clientAddr;
 
@@ -47,6 +58,10 @@ int main(int argc, char* argv[])
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(PORT);
 	bind(sockid, (SA*)&servaddr, sizeof(servaddr));
+	
+	printf("Now listening for WOL packets on %d\n", portId);
+	
+	listenForWOL(sockid, servaddr);
 
 	close(sockid);
 	return 0;
